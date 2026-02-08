@@ -77,6 +77,18 @@ services:
       - "${WEB_PORT}:3000"
     command: sh /app/scripts/dev-container.sh
 
+  mcp:
+    build:
+      context: ./apps/mcp
+    environment:
+      DECISION_API_BASE_URL: http://api:8000/v1
+      DECISION_MCP_AUDIT_LOG_PATH: /tmp/decision_mcp_audit.jsonl
+    depends_on:
+      - api
+    profiles: ["agent"]
+    stdin_open: true
+    tty: true
+
   nginx:
     image: nginx:1.27-alpine
     profiles: ["prod"]
