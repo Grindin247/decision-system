@@ -55,6 +55,9 @@ class Family(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    external_source: Mapped[str | None] = mapped_column(String(32))
+    external_id: Mapped[str | None] = mapped_column(String(255))
+    external_name: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
@@ -63,9 +66,11 @@ class FamilyMember(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     family_id: Mapped[int] = mapped_column(ForeignKey("families.id"), nullable=False)
-    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[RoleEnum] = mapped_column(SqlEnum(RoleEnum), nullable=False)
+    external_source: Mapped[str | None] = mapped_column(String(32))
+    external_id: Mapped[str | None] = mapped_column(String(255))
 
 
 class Goal(Base):
@@ -209,3 +214,8 @@ Index("ix_ledger_member_period", DiscretionaryBudgetLedger.member_id, Discretion
 Index("ix_periods_family_dates", Period.family_id, Period.start_date, Period.end_date)
 Index("ix_member_budget_settings_family_member", MemberBudgetSetting.family_id, MemberBudgetSetting.member_id, unique=True)
 Index("ix_audit_entity", AuditLog.entity_type, AuditLog.entity_id)
+
+# Auth/sync lookups
+Index("ix_family_members_family_email", FamilyMember.family_id, FamilyMember.email, unique=True)
+Index("ix_family_members_family_external", FamilyMember.family_id, FamilyMember.external_source, FamilyMember.external_id, unique=True)
+Index("ix_families_external", Family.external_source, Family.external_id, unique=True)

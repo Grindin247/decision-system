@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.auth import AuthContext, get_auth_context
 from app.core.db import get_db
 from app.models.entities import BudgetPolicy, DiscretionaryBudgetLedger, Family, FamilyMember, MemberBudgetSetting, Period
 from app.schemas.budgets import BudgetPolicyUpdate, BudgetSummaryResponse, MemberBudgetSummary
@@ -14,6 +15,7 @@ from app.services.budget import (
     member_allowance_map,
     member_remaining_in_period,
 )
+from app.services.access import require_family_admin, require_family_editor, require_family_member
 
 router = APIRouter(prefix="/v1/budgets", tags=["budgets"])
 
@@ -51,10 +53,16 @@ def _summary_response(db: Session, family_id: int, period: Period, policy: Budge
 
 
 @router.get("/families/{family_id}", response_model=BudgetSummaryResponse)
-def get_budget_summary(family_id: int, db: Session = Depends(get_db)):
+def get_budget_summary(
+    family_id: int,
+    db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
+):
     family = db.get(Family, family_id)
     if family is None:
         raise HTTPException(status_code=404, detail="family not found")
+    if ctx is not None:
+        require_family_member(db, family_id, ctx.email)
 
     policy = get_or_create_policy(db, family_id)
     period = ensure_active_period(db, family_id)
@@ -63,10 +71,17 @@ def get_budget_summary(family_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/families/{family_id}/policy", response_model=BudgetSummaryResponse)
-def update_budget_policy(family_id: int, payload: BudgetPolicyUpdate, db: Session = Depends(get_db)):
+def update_budget_policy(
+    family_id: int,
+    payload: BudgetPolicyUpdate,
+    db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
+):
     family = db.get(Family, family_id)
     if family is None:
         raise HTTPException(status_code=404, detail="family not found")
+    if ctx is not None:
+        require_family_editor(db, family_id, ctx.email)
 
     members = _family_members(db, family_id)
     member_ids = {member.id for member in members}
@@ -119,10 +134,16 @@ def update_budget_policy(family_id: int, payload: BudgetPolicyUpdate, db: Sessio
 
 
 @router.post("/families/{family_id}/period/reset", response_model=BudgetSummaryResponse)
-def reset_budget_period(family_id: int, db: Session = Depends(get_db)):
+def reset_budget_period(
+    family_id: int,
+    db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
+):
     family = db.get(Family, family_id)
     if family is None:
         raise HTTPException(status_code=404, detail="family not found")
+    if ctx is not None:
+        require_family_admin(db, family_id, ctx.email)
 
     policy = get_or_create_policy(db, family_id)
     today = date.today()

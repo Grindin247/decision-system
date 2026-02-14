@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { api, Decision, Family, FamilyMember, Goal } from "../../lib/api";
+import { api, Decision, Family, Goal } from "../../lib/api";
 
 type DecisionScoreDraft = {
   threshold: string;
@@ -11,10 +11,9 @@ type DecisionScoreDraft = {
 export default function DecisionsPage() {
   const [families, setFamilies] = useState<Family[]>([]);
   const [familyId, setFamilyId] = useState<number | null>(null);
-  const [members, setMembers] = useState<FamilyMember[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
-  const [form, setForm] = useState({ created_by_member_id: "", title: "", description: "", urgency: "3", notes: "" });
+  const [form, setForm] = useState({ title: "", description: "", urgency: "3", notes: "" });
   const [error, setError] = useState("");
 
   async function loadData(targetFamilyId?: number | null) {
@@ -23,15 +22,9 @@ export default function DecisionsPage() {
     const activeFamilyId = targetFamilyId ?? familyId ?? familyData.items[0]?.id ?? null;
     setFamilyId(activeFamilyId);
     if (activeFamilyId) {
-      const [memberData, goalData, decisionData] = await Promise.all([
-        api.listFamilyMembers(activeFamilyId),
-        api.listGoals(activeFamilyId),
-        api.listDecisions(activeFamilyId, true),
-      ]);
-      setMembers(memberData.items);
+      const [goalData, decisionData] = await Promise.all([api.listGoals(activeFamilyId), api.listDecisions(activeFamilyId, true)]);
       setGoals(goalData.items.filter((goal) => goal.active));
       setDecisions(decisionData.items);
-      setForm((prev) => ({ ...prev, created_by_member_id: String(memberData.items[0]?.id ?? "") }));
     }
   }
 
@@ -50,7 +43,6 @@ export default function DecisionsPage() {
     try {
       await api.createDecision({
         family_id: familyId,
-        created_by_member_id: Number(form.created_by_member_id),
         title: form.title,
         description: form.description,
         urgency: Number(form.urgency),
@@ -86,11 +78,6 @@ export default function DecisionsPage() {
         <div className="card">
           <h3>Create Decision</h3>
           <form className="stack" onSubmit={onCreate}>
-            <select value={form.created_by_member_id} onChange={(e) => setForm({ ...form, created_by_member_id: e.target.value })} required>
-              {members.map((member) => (
-                <option key={member.id} value={member.id}>{member.display_name} ({member.role})</option>
-              ))}
-            </select>
             <input placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
             <textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
             <div className="row">

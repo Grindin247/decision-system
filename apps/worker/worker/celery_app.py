@@ -7,6 +7,10 @@ celery_app = Celery(
 )
 
 celery_app.conf.beat_schedule = {
+    "keycloak-family-sync": {
+        "task": "worker.tasks.sync_keycloak_families",
+        "schedule": 900.0,
+    },
     "daily-due-summary": {
         "task": "worker.tasks.send_due_soon_summary",
         "schedule": 86400.0,

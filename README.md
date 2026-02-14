@@ -8,6 +8,12 @@ Monorepo starter for a spec-first Family Decision Making System.
 - Worker: Celery + Redis
 - Infra: Docker Compose + Nginx reverse proxy
 
+## Keycloak SSO + Family Sync
+When running inside Family-Cloud, the decision system is intended to sit behind Traefik Forward Auth (Keycloak OIDC).
+
+Additionally, Keycloak groups ending with `_family` are mirrored into the decision system as Families, with group members
+synced into FamilyMembers on a schedule (Celery beat).
+
 ## Quick start
 1. Copy environment template:
    - `Copy-Item .env.example .env`

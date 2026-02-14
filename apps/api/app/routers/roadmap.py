@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.auth import AuthContext, get_auth_context
 from app.core.db import get_db
-from app.models.entities import Decision, DecisionScore, DecisionStatusEnum, DiscretionaryBudgetLedger, Goal, RoadmapItem
+from app.models.entities import Decision, DecisionScore, DecisionStatusEnum, DiscretionaryBudgetLedger, FamilyMember, Goal, RoadmapItem
 from app.schemas.roadmaps import RoadmapCreate, RoadmapListResponse, RoadmapResponse, RoadmapUpdate
 from app.services.budget import (
     ensure_active_period,
@@ -14,6 +15,7 @@ from app.services.budget import (
     member_remaining_in_period,
 )
 from app.services.scoring import GoalScoreInput, compute_weighted_score
+from app.services.access import require_family_member
 
 router = APIRouter(prefix="/v1/roadmap", tags=["roadmap"])
 
@@ -47,19 +49,36 @@ def _decision_weighted_score(db: Session, decision: Decision) -> float | None:
 def list_roadmap_items(
     family_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
 ):
     query = select(RoadmapItem)
+    if ctx is not None:
+        query = (
+            query.join(Decision, Decision.id == RoadmapItem.decision_id)
+            .join(FamilyMember, FamilyMember.family_id == Decision.family_id)
+            .where(FamilyMember.email == ctx.email)
+        )
     if family_id is not None:
-        query = query.join(Decision, Decision.id == RoadmapItem.decision_id).where(Decision.family_id == family_id)
+        if ctx is not None:
+            require_family_member(db, family_id, ctx.email)
+        if ctx is None:
+            query = query.join(Decision, Decision.id == RoadmapItem.decision_id)
+        query = query.where(Decision.family_id == family_id)
     items = db.execute(query.order_by(RoadmapItem.id.desc())).scalars().all()
     return RoadmapListResponse(items=[_to_response(item) for item in items])
 
 
 @router.post("", response_model=RoadmapResponse, status_code=201)
-def create_roadmap_item(payload: RoadmapCreate, db: Session = Depends(get_db)):
+def create_roadmap_item(
+    payload: RoadmapCreate,
+    db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
+):
     decision = db.get(Decision, payload.decision_id)
     if decision is None:
         raise HTTPException(status_code=404, detail="decision not found")
+    if ctx is not None:
+        require_family_member(db, decision.family_id, ctx.email)
 
     policy = get_or_create_policy(db, decision.family_id)
     weighted_score = _decision_weighted_score(db, decision)
@@ -108,10 +127,20 @@ def create_roadmap_item(payload: RoadmapCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{roadmap_id}", response_model=RoadmapResponse)
-def update_roadmap_item(roadmap_id: int, payload: RoadmapUpdate, db: Session = Depends(get_db)):
+def update_roadmap_item(
+    roadmap_id: int,
+    payload: RoadmapUpdate,
+    db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
+):
     item = db.get(RoadmapItem, roadmap_id)
     if item is None:
         raise HTTPException(status_code=404, detail="roadmap item not found")
+    if ctx is not None:
+        decision = db.get(Decision, item.decision_id)
+        if decision is None:
+            raise HTTPException(status_code=404, detail="decision not found")
+        require_family_member(db, decision.family_id, ctx.email)
 
     if payload.bucket is not None:
         item.bucket = payload.bucket
@@ -130,10 +159,19 @@ def update_roadmap_item(roadmap_id: int, payload: RoadmapUpdate, db: Session = D
 
 
 @router.delete("/{roadmap_id}", status_code=204)
-def delete_roadmap_item(roadmap_id: int, db: Session = Depends(get_db)):
+def delete_roadmap_item(
+    roadmap_id: int,
+    db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
+):
     item = db.get(RoadmapItem, roadmap_id)
     if item is None:
         raise HTTPException(status_code=404, detail="roadmap item not found")
+    if ctx is not None:
+        decision = db.get(Decision, item.decision_id)
+        if decision is None:
+            raise HTTPException(status_code=404, detail="decision not found")
+        require_family_member(db, decision.family_id, ctx.email)
 
     if item.status != "Done":
         debits = db.execute(

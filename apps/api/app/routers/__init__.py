@@ -1,3 +1,13 @@
-from app.routers import audit, budgets, decisions, families, goals, health, roadmap
+from app.routers import admin_keycloak, audit, auth, budgets, decisions, families, goals, health, roadmap
 
-__all__ = ["health", "families", "goals", "decisions", "roadmap", "budgets", "audit"]
+__all__ = [
+    "health",
+    "auth",
+    "families",
+    "goals",
+    "decisions",
+    "roadmap",
+    "budgets",
+    "audit",
+    "admin_keycloak",
+]

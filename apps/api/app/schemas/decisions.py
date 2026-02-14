@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 class DecisionCreate(BaseModel):
     family_id: int
-    created_by_member_id: int
+    created_by_member_id: int | None = None
     owner_member_id: int | None = None
     title: str = Field(min_length=1, max_length=255)
     description: str = Field(min_length=1)

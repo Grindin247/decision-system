@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.auth import AuthContext, get_auth_context
 from app.core.db import get_db
-from app.models.entities import Decision, DecisionQueueItem, DecisionScore, DecisionStatusEnum, Goal, RoadmapItem
+from app.models.entities import Decision, DecisionQueueItem, DecisionScore, DecisionStatusEnum, FamilyMember, Goal, RoadmapItem
 from app.schemas.decisions import (
     DecisionCreate,
     DecisionGoalScoreResponse,
@@ -17,6 +18,7 @@ from app.schemas.decisions import (
     DecisionUpdate,
 )
 from app.services.scoring import GoalScoreInput, compute_weighted_score, threshold_outcome
+from app.services.access import require_family_admin, require_family_member
 
 router = APIRouter(prefix="/v1/decisions", tags=["decisions"])
 
@@ -86,25 +88,52 @@ def list_decisions(
     family_id: int | None = Query(default=None),
     include_scores: bool = Query(default=False),
     db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
 ):
     query = select(Decision)
+    if ctx is not None:
+        query = query.join(FamilyMember, FamilyMember.family_id == Decision.family_id).where(FamilyMember.email == ctx.email)
     if family_id is not None:
+        if ctx is not None:
+            require_family_member(db, family_id, ctx.email)
         query = query.where(Decision.family_id == family_id)
     decisions = db.execute(query.order_by(Decision.created_at.desc())).scalars().all()
     return DecisionListResponse(items=[_to_decision_response(db, item, include_scores=include_scores) for item in decisions])
 
 
 @router.get("/{decision_id}", response_model=DecisionResponse)
-def get_decision(decision_id: int, db: Session = Depends(get_db)):
+def get_decision(
+    decision_id: int,
+    db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
+):
     decision = _ensure_decision_exists(db, decision_id)
+    if ctx is not None:
+        require_family_member(db, decision.family_id, ctx.email)
     return _to_decision_response(db, decision, include_scores=True)
 
 
 @router.post("", response_model=DecisionResponse, status_code=201)
-def create_decision(payload: DecisionCreate, db: Session = Depends(get_db)):
+def create_decision(
+    payload: DecisionCreate,
+    db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
+):
+    created_by_member_id = payload.created_by_member_id
+    if ctx is not None:
+        member = require_family_member(db, payload.family_id, ctx.email)
+        created_by_member_id = member.id
+        if payload.owner_member_id is not None:
+            # Ensure owner belongs to the same family.
+            owner = db.get(FamilyMember, payload.owner_member_id)
+            if owner is None or owner.family_id != payload.family_id:
+                raise HTTPException(status_code=400, detail="owner_member_id must belong to the decision family")
+    if created_by_member_id is None:
+        raise HTTPException(status_code=400, detail="created_by_member_id is required when auth is disabled")
+
     decision = Decision(
         family_id=payload.family_id,
-        created_by_member_id=payload.created_by_member_id,
+        created_by_member_id=created_by_member_id,
         owner_member_id=payload.owner_member_id,
         title=payload.title,
         description=payload.description,
@@ -122,10 +151,21 @@ def create_decision(payload: DecisionCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{decision_id}", response_model=DecisionResponse)
-def update_decision(decision_id: int, payload: DecisionUpdate, db: Session = Depends(get_db)):
+def update_decision(
+    decision_id: int,
+    payload: DecisionUpdate,
+    db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
+):
     decision = _ensure_decision_exists(db, decision_id)
+    if ctx is not None:
+        require_family_member(db, decision.family_id, ctx.email)
 
     if payload.owner_member_id is not None:
+        if ctx is not None:
+            owner = db.get(FamilyMember, payload.owner_member_id)
+            if owner is None or owner.family_id != decision.family_id:
+                raise HTTPException(status_code=400, detail="owner_member_id must belong to the decision family")
         decision.owner_member_id = payload.owner_member_id
     if payload.title is not None:
         decision.title = payload.title
@@ -148,8 +188,14 @@ def update_decision(decision_id: int, payload: DecisionUpdate, db: Session = Dep
 
 
 @router.delete("/{decision_id}", status_code=204)
-def delete_decision(decision_id: int, db: Session = Depends(get_db)):
+def delete_decision(
+    decision_id: int,
+    db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
+):
     decision = _ensure_decision_exists(db, decision_id)
+    if ctx is not None:
+        require_family_admin(db, decision.family_id, ctx.email)
     db.query(DecisionScore).filter(DecisionScore.decision_id == decision.id).delete()
     db.query(DecisionQueueItem).filter(DecisionQueueItem.decision_id == decision.id).delete()
     db.query(RoadmapItem).filter(RoadmapItem.decision_id == decision.id).delete()
@@ -162,8 +208,11 @@ def manual_score_decision(
     decision_id: int,
     payload: DecisionScoreRequest,
     db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
 ):
     decision = _ensure_decision_exists(db, decision_id)
+    if ctx is not None:
+        require_family_member(db, decision.family_id, ctx.email)
 
     goal_ids = [item.goal_id for item in payload.goal_scores]
     goals = db.execute(
@@ -237,8 +286,14 @@ def manual_score_decision(
 
 
 @router.post("/{decision_id}/queue")
-def queue_decision(decision_id: int, db: Session = Depends(get_db)):
+def queue_decision(
+    decision_id: int,
+    db: Session = Depends(get_db),
+    ctx: AuthContext | None = Depends(get_auth_context),
+):
     decision = _ensure_decision_exists(db, decision_id)
+    if ctx is not None:
+        require_family_member(db, decision.family_id, ctx.email)
     queue_item = db.execute(
         select(DecisionQueueItem).where(DecisionQueueItem.decision_id == decision.id)
     ).scalar_one_or_none()

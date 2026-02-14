@@ -145,7 +145,6 @@ export const api = {
     request<{ items: Decision[] }>(`/decisions?family_id=${familyId}&include_scores=${includeScores}`),
   createDecision: (payload: {
     family_id: number;
-    created_by_member_id: number;
     owner_member_id?: number | null;
     title: string;
     description: string;
