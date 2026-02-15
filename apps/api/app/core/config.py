@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     auth_mode: str = "none"  # none | forwardauth
     internal_admin_token: str = "change-me"
+    root_path: str = ""
 
     postgres_db: str = "decision_system"
     postgres_user: str = "decision_user"

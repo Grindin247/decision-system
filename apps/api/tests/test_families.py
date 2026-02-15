@@ -47,11 +47,10 @@ def test_family_and_member_crud(client):
     )
     assert duplicate_member.status_code == 409
 
-    delete_family_blocked = client.delete(f"/v1/families/{family_id}")
-    assert delete_family_blocked.status_code == 409
-
-    delete_member = client.delete(f"/v1/families/{family_id}/members/{member_id}")
-    assert delete_member.status_code == 204
-
     delete_family = client.delete(f"/v1/families/{family_id}")
     assert delete_family.status_code == 204
+
+    # Family delete should purge dependent members as well.
+    list_families = client.get("/v1/families")
+    assert list_families.status_code == 200
+    assert len(list_families.json()["items"]) == 0

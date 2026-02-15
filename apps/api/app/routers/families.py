@@ -17,6 +17,7 @@ from app.schemas.families import (
     FamilyUpdate,
 )
 from app.services.access import require_family, require_family_admin, require_family_member
+from app.services.purge import purge_family
 
 router = APIRouter(prefix="/v1/families", tags=["families"])
 
@@ -94,12 +95,7 @@ def delete_family(
     family = require_family(db, family_id)
     if ctx is not None:
         require_family_admin(db, family_id, ctx.email)
-
-    members_exist = db.execute(select(FamilyMember.id).where(FamilyMember.family_id == family_id).limit(1)).scalar_one_or_none()
-    if members_exist is not None:
-        raise HTTPException(status_code=409, detail="family has members; delete members first")
-
-    db.delete(family)
+    purge_family(db, family.id)
     db.commit()
 
 
@@ -233,4 +229,13 @@ def delete_family_member(
         raise HTTPException(status_code=404, detail="family member not found")
 
     db.delete(member)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # Deleting a member can fail if they are referenced by decisions, budgets, etc.
+        # Avoid a 500; clients can delete the family (which purges dependents) instead.
+        raise HTTPException(
+            status_code=409,
+            detail="cannot delete member with dependent records; delete family or purge dependent records first",
+        ) from None
