@@ -1,4 +1,18 @@
-from app.routers import admin_families, admin_keycloak, audit, auth, budgets, decisions, families, goals, health, roadmap
+from app.routers import (
+    admin_families,
+    admin_keycloak,
+    agents_decision,
+    audit,
+    auth,
+    budgets,
+    decisions,
+    families,
+    family_dna,
+    goals,
+    health,
+    memory,
+    roadmap,
+)
 
 __all__ = [
     "health",
@@ -8,6 +22,9 @@ __all__ = [
     "decisions",
     "roadmap",
     "budgets",
+    "family_dna",
+    "memory",
+    "agents_decision",
     "audit",
     "admin_keycloak",
     "admin_families",

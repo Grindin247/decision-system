@@ -3,7 +3,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 
 from app.core.config import settings
-from app.routers import admin_families, admin_keycloak, audit, auth, budgets, decisions, families, goals, health, roadmap
+from app.routers import (
+    admin_families,
+    admin_keycloak,
+    agents_decision,
+    audit,
+    auth,
+    budgets,
+    decisions,
+    families,
+    family_dna,
+    goals,
+    health,
+    memory,
+    roadmap,
+)
 
 app = FastAPI(
     title="Family Decision System API",
@@ -38,6 +52,9 @@ app.include_router(goals.router)
 app.include_router(decisions.router)
 app.include_router(roadmap.router)
 app.include_router(budgets.router)
+app.include_router(family_dna.router)
+app.include_router(memory.router)
+app.include_router(agents_decision.router)
 app.include_router(audit.router)
 app.include_router(admin_keycloak.router)
 app.include_router(admin_families.router)

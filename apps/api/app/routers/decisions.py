@@ -19,6 +19,9 @@ from app.schemas.decisions import (
 )
 from app.services.scoring import GoalScoreInput, compute_weighted_score, threshold_outcome
 from app.services.access import require_family_admin, require_family_member
+from app.services.event_bus import publish_event
+from agents.common.events.subjects import Subjects
+from app.services.memory import create_document_with_embeddings
 
 router = APIRouter(prefix="/v1/decisions", tags=["decisions"])
 
@@ -147,6 +150,27 @@ def create_decision(
     db.add(decision)
     db.commit()
     db.refresh(decision)
+    try:
+        create_document_with_embeddings(
+            db,
+            family_id=decision.family_id,
+            type="decision",
+            text_value=f"Decision created: {decision.title}\n\n{decision.description}",
+            source_refs=[],
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+    try:
+        publish_event(
+            Subjects.DECISION_CREATED,
+            {"decision_id": decision.id, "title": decision.title},
+            actor=ctx.email if ctx is not None else "system",
+            family_id=decision.family_id,
+            source="decision-api.decisions",
+        )
+    except Exception:
+        pass
     return _to_decision_response(db, decision)
 
 
@@ -184,6 +208,27 @@ def update_decision(
 
     db.commit()
     db.refresh(decision)
+    try:
+        create_document_with_embeddings(
+            db,
+            family_id=decision.family_id,
+            type="decision",
+            text_value=f"Decision updated: {decision.title}\n\n{decision.description}",
+            source_refs=[],
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+    try:
+        publish_event(
+            Subjects.DECISION_UPDATED,
+            {"decision_id": decision.id},
+            actor=ctx.email if ctx is not None else "system",
+            family_id=decision.family_id,
+            source="decision-api.decisions",
+        )
+    except Exception:
+        pass
     return _to_decision_response(db, decision)
 
 
@@ -272,6 +317,33 @@ def manual_score_decision(
         decision.status = DecisionStatusEnum.needs_work
 
     db.commit()
+    try:
+        create_document_with_embeddings(
+            db,
+            family_id=decision.family_id,
+            type="rationale",
+            text_value=f"Decision scored: decision_id={decision.id} weighted_1_to_5={weighted_1_to_5} threshold={payload.threshold_1_to_5} routed_to={routed_to}. Scores: {payload.goal_scores}",
+            source_refs=[],
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+    try:
+        publish_event(
+            Subjects.DECISION_SCORED,
+            {
+                "decision_id": decision.id,
+                "weighted_total_1_to_5": weighted_1_to_5,
+                "threshold_1_to_5": payload.threshold_1_to_5,
+                "routed_to": routed_to,
+                "status": decision.status.value,
+            },
+            actor=ctx.email if ctx is not None else "system",
+            family_id=decision.family_id,
+            source="decision-api.decisions",
+        )
+    except Exception:
+        pass
 
     status_value = decision.status.value
     return DecisionScoreResponse(

@@ -16,6 +16,9 @@ from app.services.budget import (
 )
 from app.services.scoring import GoalScoreInput, compute_weighted_score
 from app.services.access import require_family_member
+from app.services.event_bus import publish_event
+from agents.common.events.subjects import Subjects
+from app.services.memory import create_document_with_embeddings
 
 router = APIRouter(prefix="/v1/roadmap", tags=["roadmap"])
 
@@ -123,6 +126,27 @@ def create_roadmap_item(
     decision.status = DecisionStatusEnum.scheduled
     db.commit()
     db.refresh(item)
+    try:
+        create_document_with_embeddings(
+            db,
+            family_id=decision.family_id,
+            type="roadmap",
+            text_value=f"Roadmap item created: id={item.id} decision_id={item.decision_id} bucket={item.bucket} start={item.start_date} end={item.end_date} status={item.status}",
+            source_refs=[],
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+    try:
+        publish_event(
+            Subjects.ROADMAP_ITEM_ADDED,
+            {"roadmap_item_id": item.id, "decision_id": item.decision_id},
+            actor=ctx.email if ctx is not None else "system",
+            family_id=decision.family_id,
+            source="decision-api.roadmap",
+        )
+    except Exception:
+        pass
     return _to_response(item)
 
 
@@ -155,6 +179,31 @@ def update_roadmap_item(
 
     db.commit()
     db.refresh(item)
+    try:
+        decision = db.get(Decision, item.decision_id)
+        if decision is not None:
+            create_document_with_embeddings(
+                db,
+                family_id=decision.family_id,
+                type="roadmap",
+                text_value=f"Roadmap item updated: id={item.id} decision_id={item.decision_id} bucket={item.bucket} start={item.start_date} end={item.end_date} status={item.status}",
+                source_refs=[],
+            )
+            db.commit()
+    except Exception:
+        db.rollback()
+    try:
+        decision = db.get(Decision, item.decision_id)
+        if decision is not None:
+            publish_event(
+                Subjects.ROADMAP_ITEM_UPDATED,
+                {"roadmap_item_id": item.id, "decision_id": item.decision_id},
+                actor=ctx.email if ctx is not None else "system",
+                family_id=decision.family_id,
+                source="decision-api.roadmap",
+            )
+    except Exception:
+        pass
     return _to_response(item)
 
 
