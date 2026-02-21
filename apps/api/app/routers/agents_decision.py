@@ -25,5 +25,5 @@ def invoke_decision_agent(
         actor = ctx.email
     agent = DecisionAgent()
     # Actor is always the authenticated user (ignore spoofing).
-    req = DecisionIntakeRequest(message=payload.message, actor=actor, family_id=payload.family_id)
+    req = DecisionIntakeRequest(message=payload.message, actor=actor, family_id=payload.family_id, session_id=payload.session_id)
     return agent.run(req)

@@ -7,6 +7,7 @@ from app.routers import (
     admin_families,
     admin_keycloak,
     agents_decision,
+    agent_sessions,
     audit,
     auth,
     budgets,
@@ -55,6 +56,7 @@ app.include_router(budgets.router)
 app.include_router(family_dna.router)
 app.include_router(memory.router)
 app.include_router(agents_decision.router)
+app.include_router(agent_sessions.router)
 app.include_router(audit.router)
 app.include_router(admin_keycloak.router)
 app.include_router(admin_families.router)

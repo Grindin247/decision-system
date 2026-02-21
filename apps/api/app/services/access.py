@@ -30,6 +30,14 @@ def require_family_member(db: Session, family_id: int, email: str) -> FamilyMemb
 def require_family_admin(db: Session, family_id: int, email: str) -> FamilyMember:
     member = require_family_member(db, family_id, email)
     if member.role != RoleEnum.admin:
+        family_has_admin = db.execute(
+            select(FamilyMember.id).where(
+                FamilyMember.family_id == family_id,
+                FamilyMember.role == RoleEnum.admin,
+            )
+        ).first()
+        if family_has_admin is None and member.role == RoleEnum.editor:
+            return member
         raise HTTPException(status_code=403, detail="admin role required")
     return member
 

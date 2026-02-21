@@ -126,6 +126,8 @@ export const api = {
     request<FamilyMember>(`/families/${familyId}/members`, { method: "POST", body: JSON.stringify(payload) }),
   updateFamilyMember: (familyId: number, memberId: number, payload: { display_name?: string; role?: string }) =>
     request<FamilyMember>(`/families/${familyId}/members/${memberId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteFamilyMember: (familyId: number, memberId: number) =>
+    request<void>(`/families/${familyId}/members/${memberId}`, { method: "DELETE" }),
 
   listGoals: (familyId: number) => request<{ items: Goal[] }>(`/goals?family_id=${familyId}`),
   createGoal: (payload: {
@@ -140,6 +142,7 @@ export const api = {
     goalId: number,
     payload: Partial<{ name: string; description: string; weight: number; action_types: string[]; active: boolean }>,
   ) => request<Goal>(`/goals/${goalId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteGoal: (goalId: number) => request<void>(`/goals/${goalId}`, { method: "DELETE" }),
 
   listDecisions: (familyId: number, includeScores = true) =>
     request<{ items: Decision[] }>(`/decisions?family_id=${familyId}&include_scores=${includeScores}`),
@@ -167,6 +170,7 @@ export const api = {
       notes: string;
     }>,
   ) => request<Decision>(`/decisions/${decisionId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteDecision: (decisionId: number) => request<void>(`/decisions/${decisionId}`, { method: "DELETE" }),
   scoreDecision: (
     decisionId: number,
     payload: {

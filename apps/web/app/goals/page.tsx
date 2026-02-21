@@ -54,6 +54,17 @@ export default function GoalsPage() {
     }
   }
 
+  async function onDeleteGoal(goalId: number) {
+    if (!familyId) return;
+    if (!window.confirm("Delete this goal?")) return;
+    try {
+      await api.deleteGoal(goalId);
+      await loadAll(familyId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete goal");
+    }
+  }
+
   return (
     <section>
       <div className="page-head">
@@ -92,7 +103,7 @@ export default function GoalsPage() {
           <h3>Current Goals</h3>
           <div className="list">
             {goals.map((goal) => (
-              <GoalRow key={goal.id} goal={goal} />
+              <GoalRow key={goal.id} goal={goal} onDelete={onDeleteGoal} />
             ))}
             {goals.length === 0 && <div className="item">No goals yet for this family.</div>}
           </div>
@@ -102,7 +113,7 @@ export default function GoalsPage() {
   );
 }
 
-function GoalRow({ goal }: { goal: Goal }) {
+function GoalRow({ goal, onDelete }: { goal: Goal; onDelete: (goalId: number) => Promise<void> | void }) {
   const [name, setName] = useState(goal.name);
   const [description, setDescription] = useState(goal.description);
   const [weight, setWeight] = useState(String(goal.weight));
@@ -135,6 +146,7 @@ function GoalRow({ goal }: { goal: Goal }) {
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {saved && <span className="badge">{saved}</span>}
           <button className="btn-secondary" type="button" onClick={() => void onSave()}>Update Goal</button>
+          <button className="btn-danger" type="button" onClick={() => void onDelete(goal.id)}>Delete Goal</button>
         </div>
       </div>
     </div>

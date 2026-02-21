@@ -55,6 +55,17 @@ export default function DecisionsPage() {
     }
   }
 
+  async function onDeleteDecision(decisionId: number) {
+    if (!familyId) return;
+    if (!window.confirm("Delete this decision?")) return;
+    try {
+      await api.deleteDecision(decisionId);
+      await loadData(familyId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete decision");
+    }
+  }
+
   return (
     <section>
       <div className="page-head">
@@ -103,6 +114,7 @@ export default function DecisionsPage() {
                 decision={decision}
                 goals={goals}
                 onSaved={() => void loadData(familyId)}
+                onDelete={onDeleteDecision}
               />
             ))}
             {decisions.length === 0 && <div className="item">No decisions yet for this family.</div>}
@@ -132,10 +144,12 @@ function DecisionRow({
   decision,
   goals,
   onSaved,
+  onDelete,
 }: {
   decision: Decision;
   goals: Goal[];
   onSaved: () => Promise<void> | void;
+  onDelete: (decisionId: number) => Promise<void> | void;
 }) {
   const [title, setTitle] = useState(decision.title);
   const [description, setDescription] = useState(decision.description);
@@ -226,6 +240,9 @@ function DecisionRow({
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button className="btn-secondary" type="button" disabled={saving} onClick={() => void onSaveDecision()}>
           {saving ? "Saving..." : "Update Decision"}
+        </button>
+        <button className="btn-danger" type="button" onClick={() => void onDelete(decision.id)}>
+          Delete Decision
         </button>
         <button className="btn-primary" type="button" onClick={() => setShowScoring((value) => !value)}>
           {showScoring ? "Hide Scoring" : "Score Decision"}

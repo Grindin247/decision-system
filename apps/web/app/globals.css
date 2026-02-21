@@ -181,6 +181,12 @@ button {
   border-color: #d9c9b4;
 }
 
+.btn-danger {
+  background: #8f2e2e;
+  color: #fff;
+  border-color: #7b2525;
+}
+
 .row {
   display: grid;
   gap: 10px;

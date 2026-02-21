@@ -90,6 +90,18 @@ export default function FamiliesPage() {
     }
   }
 
+  async function onDeleteMember(memberId: number) {
+    if (!selectedFamilyId) return;
+    if (!window.confirm("Delete this family member?")) return;
+    try {
+      await api.deleteFamilyMember(selectedFamilyId, memberId);
+      const memberData = await api.listFamilyMembers(selectedFamilyId);
+      setMembers(memberData.items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete member");
+    }
+  }
+
   return (
     <section>
       <div className="page-head">
@@ -153,7 +165,7 @@ export default function FamiliesPage() {
 
           <div className="list">
             {members.map((member) => (
-              <MemberRow key={member.id} member={member} onSave={onUpdateMember} />
+              <MemberRow key={member.id} member={member} onSave={onUpdateMember} onDelete={onDeleteMember} />
             ))}
             {members.length === 0 && <div className="item">Select or create a family to manage members.</div>}
           </div>
@@ -190,9 +202,11 @@ function FamilyRow({
 function MemberRow({
   member,
   onSave,
+  onDelete,
 }: {
   member: FamilyMember;
   onSave: (memberId: number, displayName: string, role: string) => Promise<void>;
+  onDelete: (memberId: number) => Promise<void> | void;
 }) {
   const [displayName, setDisplayName] = useState(member.display_name);
   const [role, setRole] = useState(member.role);
@@ -210,9 +224,14 @@ function MemberRow({
           <option value="viewer">viewer</option>
         </select>
       </div>
-      <button className="btn-secondary" style={{ marginTop: 8 }} onClick={() => void onSave(member.id, displayName, role)} type="button">
-        Update Member
-      </button>
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <button className="btn-secondary" onClick={() => void onSave(member.id, displayName, role)} type="button">
+          Update Member
+        </button>
+        <button className="btn-danger" onClick={() => void onDelete(member.id)} type="button">
+          Delete Member
+        </button>
+      </div>
     </div>
   );
 }
