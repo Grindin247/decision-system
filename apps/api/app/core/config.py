@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     keycloak_sync_client_id: str = "decision-system-sync"
     keycloak_sync_client_secret: str = ""
     keycloak_sync_group_suffix: str = "_family"
+    openai_api_key: str = ""
+    note_embedding_model: str = "text-embedding-3-small"
+    note_embedding_timeout_seconds: float = 20.0
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

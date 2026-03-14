@@ -17,6 +17,7 @@ from app.routers import (
     goals,
     health,
     memory,
+    notes,
     roadmap,
 )
 
@@ -55,6 +56,7 @@ app.include_router(roadmap.router)
 app.include_router(budgets.router)
 app.include_router(family_dna.router)
 app.include_router(memory.router)
+app.include_router(notes.router)
 app.include_router(agents_decision.router)
 app.include_router(agent_sessions.router)
 app.include_router(audit.router)

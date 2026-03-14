@@ -12,6 +12,7 @@ from app.routers import (
     goals,
     health,
     memory,
+    notes,
     roadmap,
 )
 
@@ -25,6 +26,7 @@ __all__ = [
     "budgets",
     "family_dna",
     "memory",
+    "notes",
     "agents_decision",
     "agent_sessions",
     "audit",

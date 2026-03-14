@@ -3,6 +3,10 @@ from __future__ import annotations
 import hashlib
 from typing import Iterable
 
+from openai import OpenAI
+
+from app.core.config import settings
+
 
 def _hash_bytes(text: str) -> bytes:
     return hashlib.sha256(text.encode("utf-8")).digest()
@@ -25,5 +29,15 @@ def embed_text(text: str, *, dim: int = 1536) -> list[float]:
 
 
 def embed_texts(texts: Iterable[str], *, dim: int = 1536) -> list[list[float]]:
-    return [embed_text(t, dim=dim) for t in texts]
-
+    values = list(texts)
+    if not values:
+        return []
+    if settings.openai_api_key.strip():
+        client = OpenAI(api_key=settings.openai_api_key, timeout=settings.note_embedding_timeout_seconds)
+        response = client.embeddings.create(
+            model=settings.note_embedding_model,
+            input=values,
+            dimensions=dim,
+        )
+        return [list(item.embedding) for item in response.data]
+    return [embed_text(t, dim=dim) for t in values]
